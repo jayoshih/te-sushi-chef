@@ -1,6 +1,6 @@
 # TE Sushi Chef
 
-## Step 0: Installation
+### Step 0: Installation
 
 * [Install pip](https://pypi.python.org/pypi/pip) if you don't have it already.
 * [Install Python3](https://www.python.org/downloads) if you don't have it already
