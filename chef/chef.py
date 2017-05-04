@@ -40,8 +40,8 @@ def _build_tree(parent, data_source):
                 derive_thumbnail=True,
                 files=[files.YouTubeVideoFile(youtube_id=child_source_node['youtube_id'])],
             )
-            for lang in child_source_node['subtitle_langs']:
-                child_node.add_file(files.YouTubeSubtitleFile(youtube_id=child_source_node['youtube_id'], language=lang))
+            for language in child_source_node['subtitle_langs']:
+                child_node.add_file(files.YouTubeSubtitleFile(youtube_id=child_source_node['youtube_id'], language=language))
             parent.add_child(child_node)
 
     return parent
