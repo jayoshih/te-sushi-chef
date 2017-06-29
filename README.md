@@ -6,7 +6,7 @@
 * [Install Python3](https://www.python.org/downloads) if you don't have it already
 * [Install Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) if you don't have it already
 * Open a terminal
-* Run `git clone https://github.com/jayoshih/te-sushi-chef.git`
+* Run `git clone https://github.com/fle-internal/te-sushi-chef` 
   then `cd te-sushi-chef`
 * Create a Python3 virtual env `virtualenv -p python3  venv`
   and activate it using `source venv/bin/activate`
@@ -21,6 +21,6 @@ You will need an authorization token to create a channel on Kolibri Studio. In o
 
 ### Step 2: Running the chef ###
  * Open te-sushi-chef/chefdata/data.py
-   * Change SOURCE_DOMAIN to your name (you only need to change this once)
-   * Change SOURCE_ID to your username (you only need to change this once)
+   * Change `SOURCE_DOMAIN` to your name (you only need to change this once)
+   * Change `SOURCE_ID` to some unique identifier for the channel
  * Run `./te_chef.py -v --reset --token=<token>`, replacing `<token>` with the token you copied earlier
