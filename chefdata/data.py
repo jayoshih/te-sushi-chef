@@ -2,7 +2,7 @@ from le_utils.constants import languages, licenses
 
 # CHANNEL SETTINGS
 SOURCE_DOMAIN = "demo.org"						# content provider's domain
-SOURCE_ID = "touchable-earth-demo"              # an alphanumeric channel ID
+SOURCE_ID = "touchable-earth-test-channel-2"              # an alphanumeric channel ID
 CHANNEL_TITLE = "Touchable Earth (demo)"        # a humand-readbale title
 CHANNEL_THUMBNAIL = "https://d1iiooxwdowqwr.cloudfront.net/pub/appsubmissions/20140218003206_PROFILEPHOTO.jpg"
 
