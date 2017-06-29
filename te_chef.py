@@ -1,20 +1,44 @@
-import youtube_dl
-from chef.data.data import SOURCE_DOMAIN, SOURCE_ID, CHANNEL_TITLE, CHANNEL_THUMBNAIL, DATA_SOURCE
+#!/usr/bin/env python
+
 from le_utils.constants import content_kinds, file_formats, licenses, languages
+from ricecooker.chefs import SushiChef
 from ricecooker.classes import nodes, files
 
-def construct_channel(**kwargs):
+from chefdata.data import SOURCE_DOMAIN, SOURCE_ID, CHANNEL_TITLE, CHANNEL_THUMBNAIL, DATA_SOURCE
 
-    channel = nodes.ChannelNode(
-        source_domain=SOURCE_DOMAIN,
-        source_id=SOURCE_ID,
-        title=CHANNEL_TITLE,
-        thumbnail=CHANNEL_THUMBNAIL,
-    )
 
-    _build_tree(channel, DATA_SOURCE)
+class TouchableEarthChef(SushiChef):
+    """
+    The chef class that takes care of uploading channel to the content curation server.
 
-    return channel
+    We'll call its `main()` method from the command line script.
+    """
+    channel_info = {
+        'CHANNEL_SOURCE_DOMAIN': SOURCE_DOMAIN,
+        'CHANNEL_SOURCE_ID': SOURCE_ID,
+        'CHANNEL_TITLE': CHANNEL_TITLE,
+        'CHANNEL_THUMBNAIL': CHANNEL_THUMBNAIL,
+    }
+
+    def construct_channel(self, **kwargs):
+        """
+        Create ChannelNode and build topic tree.
+        """
+        # create channel
+        channel_info = self.channel_info
+        channel = nodes.ChannelNode(
+            source_domain = channel_info['CHANNEL_SOURCE_DOMAIN'],
+            source_id = channel_info['CHANNEL_SOURCE_ID'],
+            title = channel_info['CHANNEL_TITLE'],
+            thumbnail = channel_info.get('CHANNEL_THUMBNAIL'),
+            description = channel_info.get('CHANNEL_DESCRIPTION'),
+        )
+
+        # build tree
+        _build_tree(channel, DATA_SOURCE)
+
+        return channel
+
 
 
 def _build_tree(parent, data_source):
@@ -53,3 +77,12 @@ def create_description(source_node):
     if source_node.get('info'):
         description += "\n\nMORE INFO: " + source_node.get('info')
     return description
+
+
+
+if __name__ == '__main__':
+    """
+    This code will run when the sushi chef is called from the command line.
+    """
+    chef = TouchableEarthChef()
+    chef.main()
