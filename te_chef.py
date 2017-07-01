@@ -211,6 +211,10 @@ def create_description(source_node):
     if transcript:
         description += "\n\nTRANSCRIPT: %s" % transcript
 
+    # Replace TE's unicode apostrophes that don't seem to show up in HTML with
+    # the unicode "RIGHT SINGLE QUOTATION MARK".
+    description = description.replace("\x92", "\u2019")
+
     return description
 
 
