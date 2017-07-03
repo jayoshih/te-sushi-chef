@@ -155,8 +155,10 @@ def scrape_content(title, content_url):
         return None
 
     description = create_description(doc.select_one(".tab-content"))
+    source_id = doc.select_one(".current_post.active .post_id")["value"]
+
     base_node_attributes = {
-        "source_id": content_url,
+        "source_id": source_id,
         "title": title,
         "license": TE_LICENSE,
         "description": description,
@@ -185,11 +187,13 @@ def scrape_content(title, content_url):
 
         with open(os.path.join(destination, "index.html"), "w") as f:
             f.write("""
+                <!doctype html>
                 <html>
                 <head></head>
                 <body>
-                    <img src="image.jpg" style="width: 100%;" />
+                    <img src="image.jpg" style="width: 100%; max-width: 1200px;" />
                 </body>
+                </html>
             """)
 
         zip_path = create_predictable_zip(destination)
