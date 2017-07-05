@@ -8,10 +8,12 @@ Consists of videos and images.
 import os
 import requests
 import tempfile
+import time
 import urllib
 from urllib.parse import urlparse, parse_qs
 
 from bs4 import BeautifulSoup
+import youtube_dl
 
 from le_utils.constants import content_kinds, file_formats, languages
 from ricecooker.chefs import SushiChef
@@ -24,7 +26,8 @@ from ricecooker.utils.zip import create_predictable_zip
 
 sess = requests.Session()
 cache = FileCache('.webcache')
-forever_adapter= CacheControlAdapter(heuristic=CacheForeverHeuristic(), cache=cache)
+forever_adapter = CacheControlAdapter(heuristic=CacheForeverHeuristic(), cache=cache)
+ydl = youtube_dl.YoutubeDL({'quiet': True})
 
 sess.mount('http://www.touchableearth.org', forever_adapter)
 
@@ -168,6 +171,15 @@ def scrape_content(title, content_url):
     if youtube_iframe:
         youtube_url = doc.select_one(".video-container iframe")["src"]
         youtube_id = get_youtube_id_from_url(youtube_url)
+
+        # Some of the videos have been removed from the YouTube channel --
+        # skip creating content nodes for them entirely so they don't show up
+        # as non-loadable videos in Kolibri.
+        try:
+            ydl.extract_info(youtube_url, download=False)
+        except youtube_dl.DownloadError as e:
+                print("        NOTE: Skipping video download due to error: ", e)
+                return None
 
         video_node = nodes.VideoNode(
             **base_node_attributes,
