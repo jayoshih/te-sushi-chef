@@ -27,7 +27,12 @@ from ricecooker.utils.zip import create_predictable_zip
 sess = requests.Session()
 cache = FileCache('.webcache')
 forever_adapter = CacheControlAdapter(heuristic=CacheForeverHeuristic(), cache=cache)
-ydl = youtube_dl.YoutubeDL({'quiet': True})
+ydl = youtube_dl.YoutubeDL({
+    'quiet': True,
+    'no_warnings': True,
+    'writesubtitles': True,
+    'allsubtitles': True,
+})
 
 sess.mount('http://www.touchableearth.org', forever_adapter)
 
@@ -172,14 +177,16 @@ def scrape_content(title, content_url):
         youtube_url = doc.select_one(".video-container iframe")["src"]
         youtube_id = get_youtube_id_from_url(youtube_url)
 
-        # Some of the videos have been removed from the YouTube channel --
-        # skip creating content nodes for them entirely so they don't show up
-        # as non-loadable videos in Kolibri.
         try:
-            ydl.extract_info(youtube_url, download=False)
+            info = ydl.extract_info(youtube_url, download=False)
+            subtitle_languages = [s.split("-")[0] for s in info["subtitles"].keys()]
+            print ("      ... with subtitles in languages:", subtitle_languages)
         except youtube_dl.DownloadError as e:
-                print("        NOTE: Skipping video download due to error: ", e)
-                return None
+            # Some of the videos have been removed from the YouTube channel --
+            # skip creating content nodes for them entirely so they don't show up
+            # as non-loadable videos in Kolibri.
+            print("        NOTE: Skipping video download due to error: ", e)
+            return None
 
         video_node = nodes.VideoNode(
             **base_node_attributes,
@@ -187,7 +194,9 @@ def scrape_content(title, content_url):
             files=[files.YouTubeVideoFile(youtube_id=youtube_id)],
         )
 
-        # TODO(davidhu): Get subtitles in other languages
+        # Add subtitles in whichever languages are available.
+        for language in subtitle_languages:
+            video_node.add_file(files.YouTubeSubtitleFile(youtube_id=youtube_id, language=language))
 
         return video_node
 
