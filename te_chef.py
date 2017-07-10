@@ -13,6 +13,7 @@ import urllib
 from urllib.parse import urlparse, parse_qs
 
 from bs4 import BeautifulSoup
+import iso639
 import youtube_dl
 
 from le_utils.constants import content_kinds, file_formats, languages
@@ -196,7 +197,22 @@ def scrape_content(title, content_url):
 
         # Add subtitles in whichever languages are available.
         for language in subtitle_languages:
-            video_node.add_file(files.YouTubeSubtitleFile(youtube_id=youtube_id, language=language))
+            code = None
+            if languages.getlang(language):
+                code = language
+            else:
+                # If the language code can't be found in the languages file,
+                # try the ISO-639-3 version of it.
+                # TODO(david): Abstract this logic into le_utils.languages.
+                ios639_3_code = iso639.languages.get(alpha2=language).part3
+                if languages.getlang(ios639_3_code):
+                    code = ios639_3_code
+
+            if not code:
+                print("      WARNING: subtitle language %s not found in languages file." % language)
+                continue
+
+            video_node.add_file(files.YouTubeSubtitleFile(youtube_id=youtube_id, language=code))
 
         return video_node
 
