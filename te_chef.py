@@ -215,7 +215,7 @@ def scrape_content(title, content_url):
                 # form as returned from youtube-dl in order to actually be able
                 # to download that language from YouTube.
                 #
-                # TODO(david): Make a change in Ricecooker so that we can
+                # TODO(davidhu): Make a change in Ricecooker so that we can
                 # resolve this issue. As of July 10, 2017, about 13 subtitles
                 # don't get downloaded due to this issue.
                 print("      WARNING: subtitle language %s not found in languages"
@@ -294,7 +294,7 @@ def get_youtube_id_from_url(value):
 
 
 # This is taken and modified from https://github.com/fle-internal/sushi-chef-ck12/blob/cb0d538b6857f399271d0895967727f635e58ee0/chef.py#L85
-# TODO(david): Extract to a util library
+# TODO(davidhu): Extract to a util library
 def make_request(url, clear_cookies=True, timeout=60, *args, **kwargs):
     if clear_cookies:
         sess.cookies.clear()
