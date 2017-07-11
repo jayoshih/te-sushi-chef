@@ -13,7 +13,6 @@ import urllib
 from urllib.parse import urlparse, parse_qs
 
 from bs4 import BeautifulSoup
-import iso639
 import youtube_dl
 
 from le_utils.constants import content_kinds, file_formats, languages
@@ -180,7 +179,7 @@ def scrape_content(title, content_url):
 
         try:
             info = ydl.extract_info(youtube_url, download=False)
-            subtitle_languages = [s.split("-")[0] for s in info["subtitles"].keys()]
+            subtitle_languages = info["subtitles"].keys()
             print ("      ... with subtitles in languages:", subtitle_languages)
         except youtube_dl.DownloadError as e:
             # Some of the videos have been removed from the YouTube channel --
@@ -197,22 +196,33 @@ def scrape_content(title, content_url):
 
         # Add subtitles in whichever languages are available.
         for language in subtitle_languages:
-            code = None
-            if languages.getlang(language):
-                code = language
-            else:
-                # If the language code can't be found in the languages file,
-                # try the ISO-639-3 version of it.
-                # TODO(david): Abstract this logic into le_utils.languages.
-                ios639_3_code = iso639.languages.get(alpha2=language).part3
-                if languages.getlang(ios639_3_code):
-                    code = ios639_3_code
-
-            if not code:
-                print("      WARNING: subtitle language %s not found in languages file." % language)
+            if not languages.getlang(language):
+                # It seems like the subtitle language codes that we get as queried
+                # from youtube-dl are not all consistent with the codes of
+                # the languages in le-utils.
+                #
+                # E.g. we may get "zh-Hans" from
+                # youtube-dl but languages.getlang("zh-Hans") returns None
+                # while languages.getlang("zh") returns something.
+                # Another example, we may get "zu" from youtube-dl but
+                # languages.getlang("zu") returns None while
+                # languages.getlang("zul") returns something ("zul" seems
+                # like the ISO-639-3 version of the language code for Zulu).
+                #
+                # Now, though it's possible that we can still find the
+                # corresponding le_utils.languages.getlang for a given
+                # language, we still need to retain the language code in the
+                # form as returned from youtube-dl in order to actually be able
+                # to download that language from YouTube.
+                #
+                # TODO(david): Make a change in Ricecooker so that we can
+                # resolve this issue. As of July 10, 2017, about 13 subtitles
+                # don't get downloaded due to this issue.
+                print("      WARNING: subtitle language %s not found in languages"
+                        " file; skipping download of this subtitle." % language)
                 continue
 
-            video_node.add_file(files.YouTubeSubtitleFile(youtube_id=youtube_id, language=code))
+            video_node.add_file(files.YouTubeSubtitleFile(youtube_id=youtube_id, language=language))
 
         return video_node
 
