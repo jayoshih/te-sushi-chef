@@ -222,10 +222,15 @@ def create_description(source_node):
     panes = source_node.select(".tab-pane")
     about = panes[0].text.strip()
     transcript  = panes[1].text.strip()
+    more_info  = panes[2].text.strip()
 
     description = about
+
     if transcript:
         description += "\n\nTRANSCRIPT: %s" % transcript
+
+    if more_info:
+        description += "\n\nMORE INFO: %s" % more_info
 
     # Replace TE's unicode apostrophes that don't seem to show up in HTML with
     # the unicode "RIGHT SINGLE QUOTATION MARK".
