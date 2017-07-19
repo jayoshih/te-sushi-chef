@@ -1,3 +1,4 @@
 le-utils==0.0.9rc23
 ricecooker>=0.6.0
 youtube-dl>=2017.6.25
+pycountry>=17.5.14

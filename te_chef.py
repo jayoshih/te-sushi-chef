@@ -13,6 +13,7 @@ import urllib
 from urllib.parse import urlparse, parse_qs
 
 from bs4 import BeautifulSoup
+import pycountry
 import youtube_dl
 
 from le_utils.constants import content_kinds, file_formats, languages
@@ -151,6 +152,61 @@ def scrape_category(title, category_url):
     return category_node
 
 
+_LANGUAGE_NAME_LOOKUP = {l.name: l for l in languages.LANGUAGELIST}
+
+
+def getlang_patched(language):
+    """A patched version of languages.getlang that tries to fallback to
+    a closest match if not found."""
+    if languages.getlang(language):
+        return language
+
+    # Try matching on the prefix: e.g. zh-Hans --> zh
+    first_part = language.split('-')[0]
+    if languages.getlang(first_part):
+        return first_part
+
+    # See if pycountry can find this language and if so, match by language name
+    # to resolve other inconsistencies.  e.g. YouTube might use "zu" while
+    # le_utils uses "zul".
+    pyc_lang = pycountry.languages.get(alpha_2=first_part)
+    if pyc_lang:
+        return _LANGUAGE_NAME_LOOKUP.get(pyc_lang.name)
+
+    return None
+
+
+class LanguagePatchedYouTubeSubtitleFile(files.YouTubeSubtitleFile):
+    """Patches ricecooker's YouTubeSubtitleFile to account for inconsistencies
+    between YouTube's language codes and those in `le-utils`:
+
+    https://github.com/learningequality/le-utils/issues/23
+
+    TODO(davidhu): This is a temporary fix and the code here should properly be
+    patched in `le-utils.constants.languages.getlang` and a small change to
+    `ricecooker.classes.files.YouTubeSubtitleFile`.
+    """
+
+    def __init__(self, youtube_id, youtube_language, **kwargs):
+        self.youtube_language = youtube_language
+        language = getlang_patched(youtube_language)
+        super(LanguagePatchedYouTubeSubtitleFile, self).__init__(
+                youtube_id=youtube_id, language=language, **kwargs)
+
+    def download_subtitle(self):
+        settings = {
+            'skip_download': True,
+            'writesubtitles': True,
+            'subtitleslangs': [self.youtube_language],
+            'subtitlesformat': "best[ext={}]".format(file_formats.VTT),
+            'quiet': True,
+            'no_warnings': True
+        }
+        download_ext = ".{lang}.{ext}".format(lang=self.youtube_language, ext=file_formats.VTT)
+        return files.download_from_web(self.youtube_url, settings,
+                file_format=file_formats.VTT, download_ext=download_ext)
+
+
 def scrape_content(title, content_url):
     """
     title: Boys' clothing
@@ -196,33 +252,8 @@ def scrape_content(title, content_url):
 
         # Add subtitles in whichever languages are available.
         for language in subtitle_languages:
-            if not languages.getlang(language):
-                # It seems like the subtitle language codes that we get as queried
-                # from youtube-dl are not all consistent with the codes of
-                # the languages in le-utils.
-                #
-                # E.g. we may get "zh-Hans" from
-                # youtube-dl but languages.getlang("zh-Hans") returns None
-                # while languages.getlang("zh") returns something.
-                # Another example, we may get "zu" from youtube-dl but
-                # languages.getlang("zu") returns None while
-                # languages.getlang("zul") returns something ("zul" seems
-                # like the ISO-639-3 version of the language code for Zulu).
-                #
-                # Now, though it's possible that we can still find the
-                # corresponding le_utils.languages.getlang for a given
-                # language, we still need to retain the language code in the
-                # form as returned from youtube-dl in order to actually be able
-                # to download that language from YouTube.
-                #
-                # TODO(davidhu): Make a change in Ricecooker so that we can
-                # resolve this issue. As of July 10, 2017, about 13 subtitles
-                # don't get downloaded due to this issue.
-                print("      WARNING: subtitle language %s not found in languages"
-                        " file; skipping download of this subtitle." % language)
-                continue
-
-            video_node.add_file(files.YouTubeSubtitleFile(youtube_id=youtube_id, language=language))
+            video_node.add_file(LanguagePatchedYouTubeSubtitleFile(
+                youtube_id=youtube_id, youtube_language=language))
 
         return video_node
 
