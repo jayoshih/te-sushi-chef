@@ -202,7 +202,7 @@ class LanguagePatchedYouTubeSubtitleFile(files.YouTubeSubtitleFile):
             'quiet': True,
             'no_warnings': True
         }
-        download_ext = ".{lang}.{ext}".format(lang=self.youtube_language, ext=file_formats.VTT)
+        download_ext = ".{lang}.{ext}".format(lang=self.language, ext=file_formats.VTT)
         return files.download_from_web(self.youtube_url, settings,
                 file_format=file_formats.VTT, download_ext=download_ext)
 
