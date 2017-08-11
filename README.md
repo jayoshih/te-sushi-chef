@@ -5,6 +5,7 @@
 * [Install pip](https://pypi.python.org/pypi/pip) if you don't have it already.
 * [Install Python3](https://www.python.org/downloads) if you don't have it already
 * [Install Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) if you don't have it already
+* [Install FFmpeg](https://www.ffmpeg.org/download.html) if you don't have it already
 * Open a terminal
 * Run `git clone https://github.com/fle-internal/te-sushi-chef` 
   then `cd te-sushi-chef`
