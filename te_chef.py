@@ -212,7 +212,7 @@ class LanguagePatchedYouTubeSubtitleFile(files.YouTubeSubtitleFile):
 WATERMARK_SETTINGS = {
     "image": "watermark.png",
     "height": 50,
-    "right": 4,
+    "right": 8,
     "bottom": 8,
     "position": ("right", "bottom"),
 }
