@@ -6,6 +6,7 @@ Consists of videos and images.
 """
 
 import os
+import re
 import requests
 import tempfile
 import time
@@ -25,6 +26,10 @@ from ricecooker.utils.browser import preview_in_browser
 from ricecooker.utils.html import download_file
 from ricecooker.utils.zip import create_predictable_zip
 from ricecooker import config
+
+
+# XXX
+FRENCH = True
 
 
 sess = requests.Session()
@@ -53,8 +58,8 @@ class TouchableEarthChef(SushiChef):
     """
     channel_info = {
         'CHANNEL_SOURCE_DOMAIN': "www.touchableearth.org",
-        'CHANNEL_SOURCE_ID': "touchable-earth",
-        'CHANNEL_TITLE': "Touchable Earth",
+        'CHANNEL_SOURCE_ID': "touchable-earth-french",
+        'CHANNEL_TITLE': "Touchable Earth (fr)",
         'CHANNEL_THUMBNAIL': "https://d1iiooxwdowqwr.cloudfront.net/pub/appsubmissions/20140218003206_PROFILEPHOTO.jpg",
     }
 
@@ -85,7 +90,11 @@ def add_countries_to_channel(channel):
     for place in places:
         title = place.text.strip()
         href = place["href"]
-        channel.add_child(scrape_country(title, href))
+        if FRENCH:
+            url = "%s?lang=fr" % href
+        else:
+            url = href
+        channel.add_child(scrape_country(title, url))
 
 
 def scrape_country(title, country_url):
@@ -93,6 +102,7 @@ def scrape_country(title, country_url):
     title: China
     country_url: http://www.touchableearth.org/china-facts-welcome/
     """
+    # XXX indicate language
     print("Scraping country node: %s (%s)" % (title, country_url))
 
     doc = get_parsed_html_from_url(country_url)
@@ -145,7 +155,11 @@ def scrape_category(title, category_url):
 
         title = content.select_one(".get_post_title2")["value"]
         site_url = content.select_one(".site_url")["value"]
-        url = "%s/%s" % (site_url, slug)
+
+        if FRENCH:
+            url = "%s/%s?lang=fr" % (site_url, slug)
+        else:
+            url = "%s/%s" % (site_url, slug)
 
         content_node = scrape_content(title, url)
         if content_node:
@@ -281,7 +295,7 @@ def scrape_content(title, content_url):
     if not doc:  # 404
         return None
 
-    description = create_description(doc.select_one(".tab-content"))
+    description = create_description(doc.select_one(".tab-content"), doc.select_one(".nav-tabs"))
     source_id = doc.select_one(".current_post.active .post_id")["value"]
 
     base_node_attributes = {
@@ -347,19 +361,27 @@ def scrape_content(title, content_url):
     return None
 
 
-def create_description(source_node):
+_STRIP_ENGLISH_RE = re.compile("English (About|More Info|Transcript):.*", re.DOTALL)
+
+def _strip_english(text):
+    return _STRIP_ENGLISH_RE.sub('', text)
+
+
+def create_description(source_node, nav_tabs):
     panes = source_node.select(".tab-pane")
-    about = panes[0].text.strip()
-    transcript  = panes[1].text.strip()
-    more_info  = panes[2].text.strip()
+    about = _strip_english(panes[0].text).strip()
+    transcript  = _strip_english(panes[1].text).strip()
+    more_info  = _strip_english(panes[2].text).strip()
+
+    tab_titles = [tab.text.strip() for tab in nav_tabs.children]
 
     description = about
 
     if transcript:
-        description += "\n\nTRANSCRIPT: %s" % transcript
+        description += "\n\n%s: %s" % (tab_titles[1].upper(), transcript)
 
     if more_info:
-        description += "\n\nMORE INFO: %s" % more_info
+        description += "\n\n%s: %s" % (tab_titles[2].upper(), more_info)
 
     # Replace TE's unicode apostrophes that don't seem to show up in HTML with
     # the unicode "RIGHT SINGLE QUOTATION MARK".
@@ -420,8 +442,8 @@ def make_request(url, clear_cookies=True, timeout=60, *args, **kwargs):
     if response.status_code != 200:
         print("NOT FOUND:", url)
         return None
-    elif not response.from_cache:
-        print("NOT CACHED:", url)
+    #elif not response.from_cache:
+        #print("NOT CACHED:", url)
 
     return response
 
