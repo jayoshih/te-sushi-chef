@@ -471,8 +471,8 @@ if __name__ == '__main__':
     """
     This code will run when the sushi chef is called from the command line.
     """
-    #print("----- Scraping Touchable Earth English channel! -----\n\n")
-    #EnglishChef().main()
+    print("----- Scraping Touchable Earth English channel! -----\n\n")
+    EnglishChef().main()
 
     print("----- Scraping Touchable Earth French channel! -----\n\n")
     FrenchChef().main()
