@@ -56,12 +56,11 @@ class TouchableEarthChef(SushiChef):
 
     We'll call its `main()` method from the command line script.
     """
-    channel_info = {
-        'CHANNEL_SOURCE_DOMAIN': "www.touchableearth.org",
-        'CHANNEL_SOURCE_ID': "touchable-earth-french",
-        'CHANNEL_TITLE': "Touchable Earth (fr)",
-        'CHANNEL_THUMBNAIL': "https://d1iiooxwdowqwr.cloudfront.net/pub/appsubmissions/20140218003206_PROFILEPHOTO.jpg",
-    }
+    # XXX how to make sure we can't instantiate raw class of this type?
+    # XXX subclasses must define: channel_info and language
+
+    def __init__(self, language="en", **kwargs):
+        super(TouchableEarthChef, self).__init__(**kwargs)
 
     def construct_channel(self, **kwargs):
         """
@@ -78,26 +77,33 @@ class TouchableEarthChef(SushiChef):
         )
 
         # build tree
-        add_countries_to_channel(channel)
+        add_countries_to_channel(channel, self.language)
 
         return channel
 
 
-def add_countries_to_channel(channel):
+class FrenchChef(TouchableEarthChef):
+    channel_info = {
+        'CHANNEL_SOURCE_DOMAIN': "www.touchableearth.org",
+        'CHANNEL_SOURCE_ID': "touchable-earth-french",
+        'CHANNEL_TITLE': "Touchable Earth (fr)",
+        'CHANNEL_THUMBNAIL': "https://d1iiooxwdowqwr.cloudfront.net/pub/appsubmissions/20140218003206_PROFILEPHOTO.jpg",
+    }
+    language = "fr"
+
+
+def add_countries_to_channel(channel, language):
     doc = get_parsed_html_from_url("http://www.touchableearth.org/places/")
     places = doc.select("div.places-row a.custom-link")
 
     for place in places:
         title = place.text.strip()
         href = place["href"]
-        if FRENCH:
-            url = "%s?lang=fr" % href
-        else:
-            url = href
-        channel.add_child(scrape_country(title, url))
+        url = "%s?lang=%s" % (href, language)
+        channel.add_child(scrape_country(title, url, language))
 
 
-def scrape_country(title, country_url):
+def scrape_country(title, country_url, language):
     """
     title: China
     country_url: http://www.touchableearth.org/china-facts-welcome/
@@ -111,25 +117,24 @@ def scrape_country(title, country_url):
     title = country.text.strip()
 
     topic = nodes.TopicNode(source_id=href, title=title)
-    add_topics_to_country(topic, href)
-
+    add_topics_to_country(doc, topic, language)
     return topic
 
 
-def add_topics_to_country(country_node, country_url):
+def add_topics_to_country(doc, country_node, language):
     """
     country_url: http://www.touchableearth.org/china/
     """
-    doc = get_parsed_html_from_url(country_url)
-    categories = doc.select(".sub_cat_listing a")
+    topic_options = doc.select(".sub_cat_dropdown .select_option_subcat option")
+    for option in topic_options:
+        if option.has_attr("selected"):
+            continue
+        url = option["value"]
+        title = option.text.strip()
+        country_node.add_child(scrape_category(title, url, language))
 
-    for category in categories:
-        url = category["href"]
-        title = category.text.strip()
-        country_node.add_child(scrape_category(title, url))
 
-
-def scrape_category(title, category_url):
+def scrape_category(title, category_url, language):
     """
     title: Culture
     category_url: http://www.touchableearth.org/china/culture/
@@ -155,12 +160,7 @@ def scrape_category(title, category_url):
 
         title = content.select_one(".get_post_title2")["value"]
         site_url = content.select_one(".site_url")["value"]
-
-        if FRENCH:
-            url = "%s/%s?lang=fr" % (site_url, slug)
-        else:
-            url = "%s/%s" % (site_url, slug)
-
+        url = "%s/%s?lang=%s" % (site_url, slug, language)
         content_node = scrape_content(title, url)
         if content_node:
             category_node.add_child(content_node)
@@ -295,7 +295,7 @@ def scrape_content(title, content_url):
     if not doc:  # 404
         return None
 
-    description = create_description(doc.select_one(".tab-content"), doc.select_one(".nav-tabs"))
+    description = create_description(doc)
     source_id = doc.select_one(".current_post.active .post_id")["value"]
 
     base_node_attributes = {
@@ -312,7 +312,8 @@ def scrape_content(title, content_url):
 
         try:
             info = ydl.extract_info(youtube_url, download=False)
-            subtitle_languages = info["subtitles"].keys()
+            subtitles = info.get("subtitles")
+            subtitle_languages = subtitles.keys() if subtitles else []
             print ("      ... with subtitles in languages:", subtitle_languages)
         except youtube_dl.DownloadError as e:
             # Some of the videos have been removed from the YouTube channel --
@@ -367,12 +368,12 @@ def _strip_english(text):
     return _STRIP_ENGLISH_RE.sub('', text)
 
 
-def create_description(source_node, nav_tabs):
-    panes = source_node.select(".tab-pane")
-    about = _strip_english(panes[0].text).strip()
-    transcript  = _strip_english(panes[1].text).strip()
-    more_info  = _strip_english(panes[2].text).strip()
+def create_description(doc):
+    about = _strip_english(doc.select_one("#tab-about").text).strip()
+    transcript = _strip_english(doc.select_one("#tab-transcript").text).strip()
+    more_info = _strip_english(doc.select_one("#tab-more-info").text).strip()
 
+    nav_tabs = doc.select_one(".tab-container .nav-tabs")
     tab_titles = [tab.text.strip() for tab in nav_tabs.children]
 
     description = about
@@ -461,5 +462,5 @@ if __name__ == '__main__':
     """
     This code will run when the sushi chef is called from the command line.
     """
-    chef = TouchableEarthChef()
+    chef = FrenchChef()
     chef.main()
