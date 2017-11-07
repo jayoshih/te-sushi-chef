@@ -57,27 +57,16 @@ class TouchableEarthChef(SushiChef):
     We'll call its `main()` method from the command line script.
     """
     # XXX how to make sure we can't instantiate raw class of this type?
-    # XXX subclasses must define: channel_info and language
-
-    def __init__(self, language="en", **kwargs):
-        super(TouchableEarthChef, self).__init__(**kwargs)
-
+    # XXX subclasses must define: channel_info
     def construct_channel(self, **kwargs):
         """
         Create ChannelNode and build topic tree.
         """
         # create channel
-        channel_info = self.channel_info
-        channel = nodes.ChannelNode(
-            source_domain = channel_info['CHANNEL_SOURCE_DOMAIN'],
-            source_id = channel_info['CHANNEL_SOURCE_ID'],
-            title = channel_info['CHANNEL_TITLE'],
-            thumbnail = channel_info.get('CHANNEL_THUMBNAIL'),
-            description = channel_info.get('CHANNEL_DESCRIPTION'),
-        )
+        channel = self.get_channel()
 
         # build tree
-        add_countries_to_channel(channel, self.language)
+        add_countries_to_channel(channel, channel.language)
 
         return channel
 
@@ -88,8 +77,9 @@ class FrenchChef(TouchableEarthChef):
         'CHANNEL_SOURCE_ID': "touchable-earth-french",
         'CHANNEL_TITLE': "Touchable Earth (fr)",
         'CHANNEL_THUMBNAIL': "https://d1iiooxwdowqwr.cloudfront.net/pub/appsubmissions/20140218003206_PROFILEPHOTO.jpg",
+        'CHANNEL_LANGUAGE': 'fr',
+        'CHANNEL_DESCRIPTION': 'Where kids teach kids about the world. Taught entirely by school age children in short videos, Touchable Earth promotes tolerance for gender, culture, and identity.',
     }
-    language = "fr"
 
 
 def add_countries_to_channel(channel, language):
