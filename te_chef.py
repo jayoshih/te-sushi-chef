@@ -15,6 +15,7 @@ from urllib.parse import urlparse, parse_qs
 from bs4 import BeautifulSoup
 import pycountry
 import youtube_dl
+import moviepy.editor as mpe
 
 from le_utils.constants import content_kinds, file_formats, languages
 from ricecooker.chefs import SushiChef
@@ -23,6 +24,7 @@ from ricecooker.utils.caching import CacheForeverHeuristic, FileCache, CacheCont
 from ricecooker.utils.browser import preview_in_browser
 from ricecooker.utils.html import download_file
 from ricecooker.utils.zip import create_predictable_zip
+from ricecooker import config
 
 
 sess = requests.Session()
@@ -207,6 +209,67 @@ class LanguagePatchedYouTubeSubtitleFile(files.YouTubeSubtitleFile):
                 file_format=file_formats.VTT, download_ext=download_ext)
 
 
+WATERMARK_SETTINGS = {
+    "image": "watermark.png",
+    "height": 68,
+    "right": 16,
+    "bottom": 16,
+    "position": ("right", "bottom"),
+}
+
+# TODO(davidhu): Move this function to Ricecooker to be reuseable. This also
+# uses a lot of Ricecooker abstractions, so it'd also be better there for
+# encapsulation.
+def watermark_video(filename):
+    # Check if we've processed this file before -- is it in the cache?
+    key = files.generate_key("WATERMARKED", filename, settings=WATERMARK_SETTINGS)
+    if not config.UPDATE and files.FILECACHE.get(key):
+        return files.FILECACHE.get(key).decode('utf-8')
+
+    # Create a temporary filename to write the watermarked video.
+    tempf = tempfile.NamedTemporaryFile(
+            suffix=".{}".format(file_formats.MP4), delete=False)
+    tempf.close()
+    tempfile_name = tempf.name
+
+    # Now watermark it with the Touchable Earth logo!
+    print("\t--- Watermarking ", filename)
+
+    video_clip = mpe.VideoFileClip(config.get_storage_path(filename), audio=True)
+
+    logo = (mpe.ImageClip(WATERMARK_SETTINGS["image"])
+                .set_duration(video_clip.duration)
+                .resize(height=WATERMARK_SETTINGS["height"])
+                .margin(right=WATERMARK_SETTINGS["right"],
+                    bottom=WATERMARK_SETTINGS["bottom"], opacity=0)
+                .set_pos(WATERMARK_SETTINGS["position"]))
+
+    composite = mpe.CompositeVideoClip([video_clip, logo])
+    composite.duration = video_clip.duration
+    composite.write_videofile(tempfile_name, threads=4)
+
+    # Now move the watermarked file to Ricecooker storage and hash its name
+    # so it can be validated.
+    watermarked_filename = "{}.{}".format(
+        files.get_hash(tempfile_name), file_formats.MP4)
+    files.copy_file_to_storage(watermarked_filename, tempfile_name)
+    os.unlink(tempfile_name)
+
+    files.FILECACHE.set(key, bytes(watermarked_filename, "utf-8"))
+    return watermarked_filename
+
+
+class WatermarkedYouTubeVideoFile(files.YouTubeVideoFile):
+    """A subclass of YouTubeVideoFile that watermarks the video in
+    a post-process step.
+    """
+    def process_file(self):
+        filename = super(WatermarkedYouTubeVideoFile, self).process_file()
+        self.filename = watermark_video(filename)
+        print("\t--- Watermarked ", self.filename)
+        return self.filename
+
+
 def scrape_content(title, content_url):
     """
     title: Boys' clothing
@@ -247,7 +310,7 @@ def scrape_content(title, content_url):
         video_node = nodes.VideoNode(
             **base_node_attributes,
             derive_thumbnail=True,
-            files=[files.YouTubeVideoFile(youtube_id=youtube_id)],
+            files=[WatermarkedYouTubeVideoFile(youtube_id=youtube_id)],
         )
 
         # Add subtitles in whichever languages are available.
