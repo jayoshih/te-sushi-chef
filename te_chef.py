@@ -96,7 +96,7 @@ def add_countries_to_channel(channel, language):
 def scrape_country(title, country_url, language):
     """
     title: China
-    country_url: http://www.touchableearth.org/china-facts-welcome/
+    country_url: http://www.touchableearth.org/china-facts-welcome/?lang=fr
     """
     # XXX indicate language
     print("Scraping country node: %s (%s)" % (title, country_url))
@@ -116,11 +116,21 @@ def add_topics_to_country(doc, country_node, language):
     country_url: http://www.touchableearth.org/china/
     """
     topic_options = doc.select(".sub_cat_dropdown .select_option_subcat option")
+    topic_urls_added = set()
+
     for option in topic_options:
         if option.has_attr("selected"):
             continue
+
         url = option["value"]
         title = option.text.strip()
+
+        # Skip duplicates
+        if url in topic_urls_added:
+            continue
+        else:
+            topic_urls_added.add(url)
+
         country_node.add_child(scrape_category(title, url, language))
 
 
