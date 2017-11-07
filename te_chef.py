@@ -316,6 +316,10 @@ def scrape_content(title, content_url):
         youtube_url = doc.select_one(".video-container iframe")["src"]
         youtube_id = get_youtube_id_from_url(youtube_url)
 
+        if not youtube_id:
+            print("    *** WARNING: youtube_id not found for content url", content_url)
+            return None
+
         try:
             info = ydl.extract_info(youtube_url, download=False)
             subtitles = info.get("subtitles")
