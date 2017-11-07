@@ -316,10 +316,9 @@ def scrape_content(title, content_url):
         youtube_url = doc.select_one(".video-container iframe")["src"]
         youtube_id = get_youtube_id_from_url(youtube_url)
 
-        print("Youtube ID is", youtube_id)
-
         if not youtube_id:
             print("    *** WARNING: youtube_id not found for content url", content_url)
+            print("    Skipping.")
             return None
 
         try:
