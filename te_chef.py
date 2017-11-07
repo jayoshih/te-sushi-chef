@@ -3,9 +3,11 @@
 """
 Sushi Chef for Touchable Earth: http://www.touchableearth.org/
 Consists of videos and images.
+Supports multiple languages -- just create another subclass of TouchableEarthChef!
 """
 
 import os
+import re
 import requests
 import tempfile
 import time
@@ -41,7 +43,8 @@ sess.mount('http://www.touchableearth.org', forever_adapter)
 
 TE_LICENSE = licenses.SpecialPermissionsLicense(
     description="Permission has been granted by Touchable Earth to"
-    " distribute this content through Kolibri."
+    " distribute this content through Kolibri.",
+    copyright_holder="Touchable Earth Foundation (New Zealand)"
 )
 
 
@@ -50,48 +53,57 @@ class TouchableEarthChef(SushiChef):
     The chef class that takes care of uploading channel to the content curation server.
 
     We'll call its `main()` method from the command line script.
+
+    NOTE: Do no directly instantiate. This is an abstract base class.
+    Subclasses must provide the channel_info class property. See examples
+    below.
     """
+    def construct_channel(self, **kwargs):
+        """
+        Create ChannelNode and build topic tree.
+        """
+        channel = self.get_channel()
+        add_countries_to_channel(channel, channel.language)
+        return channel
+
+
+class EnglishChef(TouchableEarthChef):
     channel_info = {
         'CHANNEL_SOURCE_DOMAIN': "www.touchableearth.org",
         'CHANNEL_SOURCE_ID': "touchable-earth",
         'CHANNEL_TITLE': "Touchable Earth",
         'CHANNEL_THUMBNAIL': "https://d1iiooxwdowqwr.cloudfront.net/pub/appsubmissions/20140218003206_PROFILEPHOTO.jpg",
+        'CHANNEL_LANGUAGE': 'en',
+        'CHANNEL_DESCRIPTION': 'Where kids teach kids about the world. Taught entirely by school age children in short videos, Touchable Earth promotes tolerance for gender, culture, and identity.',
     }
 
-    def construct_channel(self, **kwargs):
-        """
-        Create ChannelNode and build topic tree.
-        """
-        # create channel
-        channel_info = self.channel_info
-        channel = nodes.ChannelNode(
-            source_domain = channel_info['CHANNEL_SOURCE_DOMAIN'],
-            source_id = channel_info['CHANNEL_SOURCE_ID'],
-            title = channel_info['CHANNEL_TITLE'],
-            thumbnail = channel_info.get('CHANNEL_THUMBNAIL'),
-            description = channel_info.get('CHANNEL_DESCRIPTION'),
-        )
 
-        # build tree
-        add_countries_to_channel(channel)
-
-        return channel
+class FrenchChef(TouchableEarthChef):
+    channel_info = {
+        'CHANNEL_SOURCE_DOMAIN': "www.touchableearth.org",
+        'CHANNEL_SOURCE_ID': "touchable-earth-french",
+        'CHANNEL_TITLE': "Touchable Earth (fr)",
+        'CHANNEL_THUMBNAIL': "https://d1iiooxwdowqwr.cloudfront.net/pub/appsubmissions/20140218003206_PROFILEPHOTO.jpg",
+        'CHANNEL_LANGUAGE': 'fr',
+        'CHANNEL_DESCRIPTION': 'Where kids teach kids about the world. Taught entirely by school age children in short videos, Touchable Earth promotes tolerance for gender, culture, and identity.',
+    }
 
 
-def add_countries_to_channel(channel):
+def add_countries_to_channel(channel, language):
     doc = get_parsed_html_from_url("http://www.touchableearth.org/places/")
     places = doc.select("div.places-row a.custom-link")
 
     for place in places:
         title = place.text.strip()
         href = place["href"]
-        channel.add_child(scrape_country(title, href))
+        url = "%s?lang=%s" % (href, language)
+        channel.add_child(scrape_country(title, url, language))
 
 
-def scrape_country(title, country_url):
+def scrape_country(title, country_url, language):
     """
     title: China
-    country_url: http://www.touchableearth.org/china-facts-welcome/
+    country_url: http://www.touchableearth.org/china-facts-welcome/?lang=fr
     """
     print("Scraping country node: %s (%s)" % (title, country_url))
 
@@ -101,25 +113,34 @@ def scrape_country(title, country_url):
     title = country.text.strip()
 
     topic = nodes.TopicNode(source_id=href, title=title)
-    add_topics_to_country(topic, href)
-
+    add_topics_to_country(doc, topic, language)
     return topic
 
 
-def add_topics_to_country(country_node, country_url):
+def add_topics_to_country(doc, country_node, language):
     """
     country_url: http://www.touchableearth.org/china/
     """
-    doc = get_parsed_html_from_url(country_url)
-    categories = doc.select(".sub_cat_listing a")
+    topic_options = doc.select(".sub_cat_dropdown .select_option_subcat option")
+    topic_urls_added = set()
 
-    for category in categories:
-        url = category["href"]
-        title = category.text.strip()
-        country_node.add_child(scrape_category(title, url))
+    for option in topic_options:
+        if option.has_attr("selected"):
+            continue
+
+        url = option["value"]
+        title = option.text.strip()
+
+        # Skip duplicates
+        if url in topic_urls_added:
+            continue
+        else:
+            topic_urls_added.add(url)
+
+        country_node.add_child(scrape_category(title, url, language))
 
 
-def scrape_category(title, category_url):
+def scrape_category(title, category_url, language):
     """
     title: Culture
     category_url: http://www.touchableearth.org/china/culture/
@@ -145,8 +166,7 @@ def scrape_category(title, category_url):
 
         title = content.select_one(".get_post_title2")["value"]
         site_url = content.select_one(".site_url")["value"]
-        url = "%s/%s" % (site_url, slug)
-
+        url = "%s/%s?lang=%s" % (site_url, slug, language)
         content_node = scrape_content(title, url)
         if content_node:
             category_node.add_child(content_node)
@@ -281,7 +301,7 @@ def scrape_content(title, content_url):
     if not doc:  # 404
         return None
 
-    description = create_description(doc.select_one(".tab-content"))
+    description = create_description(doc)
     source_id = doc.select_one(".current_post.active .post_id")["value"]
 
     base_node_attributes = {
@@ -296,9 +316,15 @@ def scrape_content(title, content_url):
         youtube_url = doc.select_one(".video-container iframe")["src"]
         youtube_id = get_youtube_id_from_url(youtube_url)
 
+        if not youtube_id:
+            print("    *** WARNING: youtube_id not found for content url", content_url)
+            print("    Skipping.")
+            return None
+
         try:
             info = ydl.extract_info(youtube_url, download=False)
-            subtitle_languages = info["subtitles"].keys()
+            subtitles = info.get("subtitles")
+            subtitle_languages = subtitles.keys() if subtitles else []
             print ("      ... with subtitles in languages:", subtitle_languages)
         except youtube_dl.DownloadError as e:
             # Some of the videos have been removed from the YouTube channel --
@@ -347,19 +373,27 @@ def scrape_content(title, content_url):
     return None
 
 
-def create_description(source_node):
-    panes = source_node.select(".tab-pane")
-    about = panes[0].text.strip()
-    transcript  = panes[1].text.strip()
-    more_info  = panes[2].text.strip()
+_STRIP_ENGLISH_RE = re.compile("English (About|More Info|Transcript):.*", re.DOTALL)
+
+def _strip_english(text):
+    return _STRIP_ENGLISH_RE.sub('', text)
+
+
+def create_description(doc):
+    about = _strip_english(doc.select_one("#tab-about").text).strip()
+    transcript = _strip_english(doc.select_one("#tab-transcript").text).strip()
+    more_info = _strip_english(doc.select_one("#tab-more-info").text).strip()
+
+    nav_tabs = doc.select_one(".tab-container .nav-tabs")
+    tab_titles = [tab.text.strip() for tab in nav_tabs.children]
 
     description = about
 
     if transcript:
-        description += "\n\nTRANSCRIPT: %s" % transcript
+        description += "\n\n%s: %s" % (tab_titles[1].upper(), transcript)
 
     if more_info:
-        description += "\n\nMORE INFO: %s" % more_info
+        description += "\n\n%s: %s" % (tab_titles[2].upper(), more_info)
 
     # Replace TE's unicode apostrophes that don't seem to show up in HTML with
     # the unicode "RIGHT SINGLE QUOTATION MARK".
@@ -420,8 +454,6 @@ def make_request(url, clear_cookies=True, timeout=60, *args, **kwargs):
     if response.status_code != 200:
         print("NOT FOUND:", url)
         return None
-    elif not response.from_cache:
-        print("NOT CACHED:", url)
 
     return response
 
@@ -439,5 +471,8 @@ if __name__ == '__main__':
     """
     This code will run when the sushi chef is called from the command line.
     """
-    chef = TouchableEarthChef()
-    chef.main()
+    print("----- Scraping Touchable Earth English channel! -----\n\n")
+    EnglishChef().main()
+
+    print("----- Scraping Touchable Earth French channel! -----\n\n")
+    FrenchChef().main()
