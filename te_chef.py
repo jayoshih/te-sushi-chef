@@ -46,7 +46,8 @@ sess.mount('http://www.touchableearth.org', forever_adapter)
 
 TE_LICENSE = licenses.SpecialPermissionsLicense(
     description="Permission has been granted by Touchable Earth to"
-    " distribute this content through Kolibri."
+    " distribute this content through Kolibri.",
+    copyright_holder="Touchable Earth Foundation (New Zealand)"
 )
 
 
