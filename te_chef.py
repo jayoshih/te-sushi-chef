@@ -70,7 +70,7 @@ class TouchableEarthChef(SushiChef):
 class EnglishChef(TouchableEarthChef):
     channel_info = {
         'CHANNEL_SOURCE_DOMAIN': "www.touchableearth.org",
-        'CHANNEL_SOURCE_ID': "touchable-earth-english",
+        'CHANNEL_SOURCE_ID': "touchable-earth",
         'CHANNEL_TITLE': "Touchable Earth",
         'CHANNEL_THUMBNAIL': "https://d1iiooxwdowqwr.cloudfront.net/pub/appsubmissions/20140218003206_PROFILEPHOTO.jpg",
         'CHANNEL_LANGUAGE': 'en',
