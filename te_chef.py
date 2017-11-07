@@ -449,8 +449,6 @@ def make_request(url, clear_cookies=True, timeout=60, *args, **kwargs):
     if response.status_code != 200:
         print("NOT FOUND:", url)
         return None
-    #elif not response.from_cache:
-        #print("NOT CACHED:", url)
 
     return response
 
