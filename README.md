@@ -24,4 +24,8 @@ You will need an authorization token to create a channel on Kolibri Studio. In o
  * Open te-sushi-chef/chefdata/data.py
    * Change `SOURCE_DOMAIN` to your name (you only need to change this once)
    * Change `SOURCE_ID` to some unique identifier for the channel
- * Run `./te_chef.py -v --reset --token=<token>`, replacing `<token>` with the token you copied earlier
+ * For English channel run `./te_chef.py -v --reset --token=<token> lang=en`,
+   replacing `<token>` with the token you copied earlier
+ * For French channel run `./te_chef.py -v --reset --token=<token> lang=fr`,
+   replacing `<token>` with the token you copied earlier
+
