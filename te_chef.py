@@ -53,40 +53,32 @@ class TouchableEarthChef(SushiChef):
     The chef class that takes care of uploading channel to the content curation server.
 
     We'll call its `main()` method from the command line script.
-
-    NOTE: Do no directly instantiate. This is an abstract base class.
-    Subclasses must provide the channel_info class property. See examples
-    below.
     """
+
+    def get_channel(self, **kwargs):
+        """
+        Return the `ChannelNode` for the Touchable Earth for a particular langage.
+        """
+        if 'lang' not in kwargs:
+            raise ValueError('Must specify lang=?? on the command line. Supported languages are en, fr, ?????.')
+        lang = kwargs['lang']
+        channel = nodes.ChannelNode(
+            source_domain = 'www.touchableearth.org',
+            source_id = 'touchable-earth-%s' % lang,
+            title = 'Touchable Earth (%s)' % lang,
+            thumbnail = 'https://d1iiooxwdowqwr.cloudfront.net/pub/appsubmissions/20140218003206_PROFILEPHOTO.jpg',
+            description = 'Where kids teach kids about the world. Taught entirely by school age children in short videos, Touchable Earth promotes tolerance for gender, culture, and identity.',
+            language = lang,
+        )
+        return channel
+
     def construct_channel(self, **kwargs):
         """
         Create ChannelNode and build topic tree.
         """
-        channel = self.get_channel()
+        channel = self.get_channel(**kwargs)
         add_countries_to_channel(channel, channel.language)
         return channel
-
-
-class EnglishChef(TouchableEarthChef):
-    channel_info = {
-        'CHANNEL_SOURCE_DOMAIN': "www.touchableearth.org",
-        'CHANNEL_SOURCE_ID': "touchable-earth",
-        'CHANNEL_TITLE': "Touchable Earth",
-        'CHANNEL_THUMBNAIL': "https://d1iiooxwdowqwr.cloudfront.net/pub/appsubmissions/20140218003206_PROFILEPHOTO.jpg",
-        'CHANNEL_LANGUAGE': 'en',
-        'CHANNEL_DESCRIPTION': 'Where kids teach kids about the world. Taught entirely by school age children in short videos, Touchable Earth promotes tolerance for gender, culture, and identity.',
-    }
-
-
-class FrenchChef(TouchableEarthChef):
-    channel_info = {
-        'CHANNEL_SOURCE_DOMAIN': "www.touchableearth.org",
-        'CHANNEL_SOURCE_ID': "touchable-earth-french",
-        'CHANNEL_TITLE': "Touchable Earth (fr)",
-        'CHANNEL_THUMBNAIL': "https://d1iiooxwdowqwr.cloudfront.net/pub/appsubmissions/20140218003206_PROFILEPHOTO.jpg",
-        'CHANNEL_LANGUAGE': 'fr',
-        'CHANNEL_DESCRIPTION': 'Where kids teach kids about the world. Taught entirely by school age children in short videos, Touchable Earth promotes tolerance for gender, culture, and identity.',
-    }
 
 
 def add_countries_to_channel(channel, language):
@@ -471,8 +463,6 @@ if __name__ == '__main__':
     """
     This code will run when the sushi chef is called from the command line.
     """
-    print("----- Scraping Touchable Earth English channel! -----\n\n")
-    EnglishChef().main()
+    print("----- Scraping Touchable Earth channel! -----\n\n")
+    TouchableEarthChef().main()
 
-    print("----- Scraping Touchable Earth French channel! -----\n\n")
-    FrenchChef().main()
