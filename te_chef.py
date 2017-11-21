@@ -166,61 +166,6 @@ def scrape_category(title, category_url, language):
     return category_node
 
 
-_LANGUAGE_NAME_LOOKUP = {l.name: l for l in languages.LANGUAGELIST}
-
-
-def getlang_patched(language):
-    """A patched version of languages.getlang that tries to fallback to
-    a closest match if not found."""
-    if languages.getlang(language):
-        return language
-
-    # Try matching on the prefix: e.g. zh-Hans --> zh
-    first_part = language.split('-')[0]
-    if languages.getlang(first_part):
-        return first_part
-
-    # See if pycountry can find this language and if so, match by language name
-    # to resolve other inconsistencies.  e.g. YouTube might use "zu" while
-    # le_utils uses "zul".
-    pyc_lang = pycountry.languages.get(alpha_2=first_part)
-    if pyc_lang:
-        return _LANGUAGE_NAME_LOOKUP.get(pyc_lang.name)
-
-    return None
-
-
-class LanguagePatchedYouTubeSubtitleFile(files.YouTubeSubtitleFile):
-    """Patches ricecooker's YouTubeSubtitleFile to account for inconsistencies
-    between YouTube's language codes and those in `le-utils`:
-
-    https://github.com/learningequality/le-utils/issues/23
-
-    TODO(davidhu): This is a temporary fix and the code here should properly be
-    patched in `le-utils.constants.languages.getlang` and a small change to
-    `ricecooker.classes.files.YouTubeSubtitleFile`.
-    """
-
-    def __init__(self, youtube_id, youtube_language, **kwargs):
-        self.youtube_language = youtube_language
-        language = getlang_patched(youtube_language)
-        super(LanguagePatchedYouTubeSubtitleFile, self).__init__(
-                youtube_id=youtube_id, language=language, **kwargs)
-
-    def download_subtitle(self):
-        settings = {
-            'skip_download': True,
-            'writesubtitles': True,
-            'subtitleslangs': [self.youtube_language],
-            'subtitlesformat': "best[ext={}]".format(file_formats.VTT),
-            'quiet': True,
-            'no_warnings': True
-        }
-        download_ext = ".{lang}.{ext}".format(lang=self.language, ext=file_formats.VTT)
-        return files.download_from_web(self.youtube_url, settings,
-                file_format=file_formats.VTT, download_ext=download_ext)
-
-
 WATERMARK_SETTINGS = {
     "image": "watermark.png",
     "height": 68,
@@ -333,8 +278,8 @@ def scrape_content(title, content_url):
 
         # Add subtitles in whichever languages are available.
         for language in subtitle_languages:
-            video_node.add_file(LanguagePatchedYouTubeSubtitleFile(
-                youtube_id=youtube_id, youtube_language=language))
+            video_node.add_file(files.YouTubeSubtitleFile(
+                youtube_id=youtube_id, language=language))
 
         return video_node
 
