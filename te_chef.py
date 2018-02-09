@@ -305,6 +305,7 @@ def scrape_content(title, content_url):
         return nodes.HTML5AppNode(
             **base_node_attributes,
             files=[files.HTMLZipFile(zip_path)],
+            thumbnail=img_src,
         )
 
     return None
