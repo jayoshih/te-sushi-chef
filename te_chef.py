@@ -129,18 +129,22 @@ def add_topics_to_country(doc, country_node, language):
         else:
             topic_urls_added.add(url)
 
-        country_node.add_child(scrape_category(title, url, language))
+        country_node.add_child(scrape_category(
+            title, url, language, country_node.title))
 
 
-def scrape_category(title, category_url, language):
+def scrape_category(category_title, category_url, language, country_title):
     """
-    title: Culture
+    category_title: Culture
     category_url: http://www.touchableearth.org/china/culture/
         ... redirects to: http://www.touchableearth.org/china-culture-boys-clothing/
     """
-    print("  Scraping category node: %s (%s)" % (title, category_url))
+    print("  Scraping category node: %s (%s)" % (category_title, category_url))
 
-    category_node = nodes.TopicNode(source_id=category_url, title=title)
+    category_node = nodes.TopicNode(
+        source_id=category_url,
+        title=add_country_to_category(category_title, country_title),
+    )
 
     # Iterate over each item in the "subway" sidebar menu on the left.
     doc = get_parsed_html_from_url(category_url)
@@ -164,6 +168,23 @@ def scrape_category(title, category_url, language):
             category_node.add_child(content_node)
 
     return category_node
+
+
+def add_country_to_category(category_title, country_title):
+    """E.g. "Facts" --> "Facts about India"."""
+    title_formatter = {
+        "facts": "Facts about %s",
+        "family": "Family in %s",
+        "culture": "Culture in %s",
+        "friends": "Friends in %s",
+        "play": "Playing in %s",
+        "school": "School in %s",
+    }.get(category_title.lower())
+
+    if title_formatter:
+        return title_formatter % country_title
+    else:
+        return "%s (%s)" % (category_title, country_title)
 
 
 WATERMARK_SETTINGS = {
