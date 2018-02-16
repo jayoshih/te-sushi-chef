@@ -105,7 +105,11 @@ def scrape_country(title, country_url, language):
     href = country["href"]
     title = country.text.strip()
 
-    topic = nodes.TopicNode(source_id=href, title=title)
+    topic = nodes.TopicNode(
+        source_id=href,
+        title=title,
+        thumbnail='topic_thumbnail.png',
+    )
     add_topics_to_country(doc, topic, language)
     return topic
 
@@ -145,6 +149,7 @@ def scrape_category(category_title, category_url, language, country_title):
     category_node = nodes.TopicNode(
         source_id=category_url,
         title=add_country_to_category(category_title, country_title),
+        thumbnail='topic_thumbnail.png',
     )
 
     # Iterate over each item in the "subway" sidebar menu on the left.
