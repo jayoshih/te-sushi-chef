@@ -134,8 +134,9 @@ def add_topics_to_country(doc, country_node, language):
         else:
             topic_urls_added.add(url)
 
-        country_node.add_child(scrape_category(
-            title, url, language, country_node.title))
+        category_node = scrape_category(title, url, language, country_node.title)
+        if category_node:
+            country_node.add_child(category_node)
 
 
 def scrape_category(category_title, category_url, language, country_title):
@@ -154,6 +155,9 @@ def scrape_category(category_title, category_url, language, country_title):
 
     # Iterate over each item in the "subway" sidebar menu on the left.
     doc = get_parsed_html_from_url(category_url)
+    if not doc:
+        return None
+
     content_items = doc.select(".post_title_sub .current_post")
     slugs_added = set()
 
