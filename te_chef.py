@@ -40,6 +40,7 @@ ydl = youtube_dl.YoutubeDL({
 })
 
 sess.mount('http://www.touchableearth.org', forever_adapter)
+sess.mount('https://i.ytimg.com', forever_adapter)
 
 TE_LICENSE = licenses.SpecialPermissionsLicense(
     description="Permission has been granted by Touchable Earth to"
@@ -104,7 +105,11 @@ def scrape_country(title, country_url, language):
     href = country["href"]
     title = country.text.strip()
 
-    topic = nodes.TopicNode(source_id=href, title=title)
+    topic = nodes.TopicNode(
+        source_id=href,
+        title=title,
+        thumbnail='topic_thumbnail.png',
+    )
     add_topics_to_country(doc, topic, language)
     return topic
 
@@ -116,7 +121,7 @@ def add_topics_to_country(doc, country_node, language):
     topic_options = doc.select(".sub_cat_dropdown .select_option_subcat option")
     topic_urls_added = set()
 
-    for option in topic_options:
+    for i, option in enumerate(topic_options):
         if option.has_attr("selected"):
             continue
 
@@ -129,21 +134,30 @@ def add_topics_to_country(doc, country_node, language):
         else:
             topic_urls_added.add(url)
 
-        country_node.add_child(scrape_category(title, url, language))
+        category_node = scrape_category(title, url, language, country_node.title)
+        if category_node:
+            country_node.add_child(category_node)
 
 
-def scrape_category(title, category_url, language):
+def scrape_category(category_title, category_url, language, country_title):
     """
-    title: Culture
+    category_title: Culture
     category_url: http://www.touchableearth.org/china/culture/
         ... redirects to: http://www.touchableearth.org/china-culture-boys-clothing/
     """
-    print("  Scraping category node: %s (%s)" % (title, category_url))
+    print("  Scraping category node: %s (%s)" % (category_title, category_url))
 
-    category_node = nodes.TopicNode(source_id=category_url, title=title)
+    category_node = nodes.TopicNode(
+        source_id=category_url,
+        title=add_country_to_category(category_title, country_title),
+        thumbnail='topic_thumbnail.png',
+    )
 
     # Iterate over each item in the "subway" sidebar menu on the left.
     doc = get_parsed_html_from_url(category_url)
+    if not doc:
+        return None
+
     content_items = doc.select(".post_title_sub .current_post")
     slugs_added = set()
 
@@ -166,18 +180,36 @@ def scrape_category(title, category_url, language):
     return category_node
 
 
+def add_country_to_category(category_title, country_title):
+    """E.g. "Facts" --> "Facts about India"."""
+    title_formatter = {
+        "facts": "Facts about %s",
+        "family": "Family in %s",
+        "culture": "Culture in %s",
+        "friends": "Friends in %s",
+        "play": "Playing in %s",
+        "school": "School in %s",
+    }.get(category_title.lower())
+
+    if title_formatter:
+        return title_formatter % country_title
+    else:
+        return "%s (%s)" % (category_title, country_title)
+
+
 WATERMARK_SETTINGS = {
     "image": "watermark.png",
     "height": 68,
     "right": 16,
     "bottom": 16,
     "position": ("right", "bottom"),
+    "with_overlay": True,
 }
 
 # TODO(davidhu): Move this function to Ricecooker to be reuseable. This also
 # uses a lot of Ricecooker abstractions, so it'd also be better there for
 # encapsulation.
-def watermark_video(filename):
+def overlay_and_watermark_video(filename, youtube_id):
     # Check if we've processed this file before -- is it in the cache?
     key = files.generate_key("WATERMARKED", filename, settings=WATERMARK_SETTINGS)
     if not config.UPDATE and files.FILECACHE.get(key):
@@ -190,19 +222,42 @@ def watermark_video(filename):
     tempfile_name = tempf.name
 
     # Now watermark it with the Touchable Earth logo!
-    print("\t--- Watermarking ", filename)
+    print("\t--- Watermarking and adding overlay ", filename)
+
+    # First add the overlay image -- this is the image shown as the first frame
+    # so that when the video hasn't been played yet, it will show this image
+    # rather than a black screen (since Touchable Earth's videos start from
+    # a blank black screen).
+
+    # Download the overlay image based on the YouTube ID
+    overlay_src = 'https://i.ytimg.com/vi_webp/%s/maxresdefault.webp' % youtube_id
+    print("\t    ... grabbing overlay image from %s" % overlay_src)
+    destination = tempfile.mkdtemp()
+    overlay_filename = "overlay.webp"
+    overlay_file = os.path.join(destination, overlay_filename)
+    _, response = download_file(overlay_src, destination, request_fn=sess.get,
+            filename=overlay_filename)
 
     video_clip = mpe.VideoFileClip(config.get_storage_path(filename), audio=True)
 
+    if response.status_code == 200:
+        overlay_clip = mpe.ImageClip(overlay_file).set_duration(0.1)
+        concat_clips = mpe.concatenate_videoclips([overlay_clip, video_clip])
+    else:
+        concat_clips = video_clip
+        print("\t    WARNING: Could not download overlay image file from %s" % overlay_src)
+
+    # Now create the watermark logo as a clip ...
     logo = (mpe.ImageClip(WATERMARK_SETTINGS["image"])
-                .set_duration(video_clip.duration)
+                .set_duration(concat_clips.duration)
                 .resize(height=WATERMARK_SETTINGS["height"])
                 .margin(right=WATERMARK_SETTINGS["right"],
                     bottom=WATERMARK_SETTINGS["bottom"], opacity=0)
                 .set_pos(WATERMARK_SETTINGS["position"]))
 
-    composite = mpe.CompositeVideoClip([video_clip, logo])
-    composite.duration = video_clip.duration
+    # And then combine it with the video clip.
+    composite = mpe.CompositeVideoClip([concat_clips, logo])
+    composite.duration = concat_clips.duration
     composite.write_videofile(tempfile_name, threads=4)
 
     # Now move the watermarked file to Ricecooker storage and hash its name
@@ -211,18 +266,23 @@ def watermark_video(filename):
         files.get_hash(tempfile_name), file_formats.MP4)
     files.copy_file_to_storage(watermarked_filename, tempfile_name)
     os.unlink(tempfile_name)
+    os.unlink(overlay_file)
 
     files.FILECACHE.set(key, bytes(watermarked_filename, "utf-8"))
     return watermarked_filename
 
 
 class WatermarkedYouTubeVideoFile(files.YouTubeVideoFile):
-    """A subclass of YouTubeVideoFile that watermarks the video in
-    a post-process step.
+    """A subclass of YouTubeVideoFile that watermarks and adds an initial
+    overlay image to the video in a post-process step.
     """
+    def __init__(self, youtube_id, **kwargs):
+        self.youtube_id = youtube_id
+        super(WatermarkedYouTubeVideoFile, self).__init__(youtube_id, **kwargs)
+
     def process_file(self):
         filename = super(WatermarkedYouTubeVideoFile, self).process_file()
-        self.filename = watermark_video(filename)
+        self.filename = overlay_and_watermark_video(filename, self.youtube_id)
         print("\t--- Watermarked ", self.filename)
         return self.filename
 
@@ -305,6 +365,7 @@ def scrape_content(title, content_url):
         return nodes.HTML5AppNode(
             **base_node_attributes,
             files=[files.HTMLZipFile(zip_path)],
+            thumbnail=img_src,
         )
 
     return None
